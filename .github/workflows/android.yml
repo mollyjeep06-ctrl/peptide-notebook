@@ -1,0 +1,64 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.zip"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Скачать проект
+        uses: actions/checkout@v4
+
+      - name: Установить Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Установить Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Установить компоненты Android
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Установить Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Распаковать проект
+        shell: bash
+        run: |
+          shopt -s nullglob
+          archives=(peptide-notebook-android-project*.zip)
+          if [ "${#archives[@]}" -ne 1 ]; then
+            echo "Нужен один архив peptide-notebook-android-project.zip"
+            exit 1
+          fi
+          unzip -q "${archives[0]}" -d source
+          test -f source/peptide-notebook-android/app/build.gradle
+
+      - name: Собрать APK
+        run: >
+          gradle
+          -p source/peptide-notebook-android
+          --no-daemon
+          assembleDebug
+
+      - name: Сохранить APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Peptide-Notebook-APK
+          path: source/peptide-notebook-android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
